@@ -2,8 +2,8 @@ import urllib, urllib2, cookielib, base64, re, json, hashlib, time, os
 from lxml.html import fromstring
 import base62
 
-username = 'xxxxxx'
-password = 'xxxxxx'
+username = 'mojing.cosmetics@gmail.com'
+password = '5uR4ISUNUg'
 client = 'ssologin.js(v.1.3.18)'
 
 def crawl(url, opener):
@@ -46,7 +46,7 @@ def weibo_login():
                 'returntype' : 'META'}
     request = urllib2.Request('http://login.sina.com.cn/sso/login.php?client=%s' % client, urllib.urlencode(postData))
     loginData = opener.open(request)
-    loginUrl = re.search(r'replace\(\'([^\']+)\'', loginData.read()).group(1)
+    loginUrl = re.search(r'replace\([\"\']([^\'\"]+)[\"\']', loginData.read()).group(1)
     loginResult = opener.open(loginUrl).read()
     print loginResult
     if (re.search(r'\"result\":true', loginResult) == None):
