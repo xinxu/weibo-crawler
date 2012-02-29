@@ -185,9 +185,9 @@ def recursive_run(uid, wid):
     page = parser.parse_all()
     cache['list'].append(page)
     cache['count'] = len(page['reposts'])
+    record(depth, cache)
     while (cache['count'] > 0):
         total_count += cache['count']
-        record(depth, cache)
         depth += 1
         new_cache = new_cache(depth)
         for page in cache['list']:
@@ -197,6 +197,7 @@ def recursive_run(uid, wid):
                 new_cache['list'].append(page)
                 new_cache['count'] = len(page['reposts'])
         cache = new_cache
+        record(depth, cache)
     with open('%s/total.txt' % dir_str, 'w') as f:
         f.write('total count of repost is %d\n' % total_count)
 
