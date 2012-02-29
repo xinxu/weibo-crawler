@@ -2,8 +2,8 @@ import urllib, urllib2, cookielib, base64, re, json, hashlib, time, os
 from lxml.html import fromstring
 import base62
 
-username = 'your acount'
-password = 'your password'
+username = 'xxxxxx'
+password = 'xxxxxx'
 client = 'ssologin.js(v.1.3.18)'
 
 def crawl(url, opener):
@@ -48,9 +48,9 @@ def weibo_login():
     loginData = opener.open(request)
     loginUrl = re.search(r'replace\(\'([^\']+)\'', loginData.read()).group(1)
     loginResult = opener.open(loginUrl).read()
+    print loginResult
     if (re.search(r'\"result\":true', loginResult) == None):
         raise 'login failed'
-    print loginResult
     return opener
 
 class WeiboParser(object):
@@ -190,7 +190,7 @@ def recursive_run(uid, wid):
     while (cache['count'] > 0):
         total_count += cache['count']
         depth += 1
-        new_cache = new_cache(depth)
+        new_cache = create_cache(depth)
         for page in cache['list']:
             for repost in page['reposts']:
                 parser = WeiboParser(opener, repost['uid'], repost['wid'])
