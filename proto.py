@@ -1,10 +1,7 @@
 import urllib, urllib2, cookielib, base64, re, json, hashlib, time, os
 from lxml.html import fromstring
 import base62
-
-username = 'mojing.cosmetics@gmail.com'
-password = '5uR4ISUNUg'
-client = 'ssologin.js(v.1.3.18)'
+import settings
 
 def crawl(url, opener):
     print 'try crawling %s\n' % url
@@ -24,7 +21,8 @@ def weibo_login():
     opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
     resp = opener.open('http://login.sina.com.cn/sso/prelogin.php' + \
               '?entry=weibo&callback=sinaSSOController.preloginCallBack' + \
-                '&su=%s&client=%s' %(base64.b64encode(username), client))
+                '&su=%s&client=%s' %(base64.b64encode(settings.username),
+                    settings.client))
     respData = re.match(r'[^{]+({[^}]+})', resp.read()).group(1)
     jsonRespData = json.loads(respData)
     postData = {'entry' : 'weibo',
@@ -33,18 +31,18 @@ def weibo_login():
                 'savestate' : 7,
                 'useticket' : 1,
                 'ssosimplelogin' : 1,
-                'su' : base64.b64encode(urllib.quote(username)),
+                'su' : base64.b64encode(urllib.quote(settings.username)),
                 'service' : 'miniblog',
                 'servertime' : jsonRespData['servertime'],
                 'nonce' : jsonRespData['nonce'],
                 'pwencode' : 'wsse',
-                'sp' : sha1(sha1(sha1(password)) + \
+                'sp' : sha1(sha1(sha1(settings.password)) + \
                         str(jsonRespData['servertime']) + \
                         jsonRespData['nonce']),
                 'encoding' : 'UTF-8',
                 'url' :  'http://weibo.com/ajaxlogin.php?framelogin=1&callback=parent.sinaSSOController.feedBackUrlCallBack',
                 'returntype' : 'META'}
-    request = urllib2.Request('http://login.sina.com.cn/sso/login.php?client=%s' % client, urllib.urlencode(postData))
+    request = urllib2.Request('http://login.sina.com.cn/sso/login.php?client=%s' % settings.client, urllib.urlencode(postData))
     loginData = opener.open(request)
     loginUrl = re.search(r'replace\([\"\']([^\'\"]+)[\"\']', loginData.read()).group(1)
     loginResult = opener.open(loginUrl).read()
@@ -54,11 +52,14 @@ def weibo_login():
     return opener
 
 class WeiboParser(object):
-    def __init__(self, opener, uid, wid):
+    def __init__(self, opener, uid, wid, nick):
         self.opener = opener
         self.uid = uid
         self.wid = wid
         self.mid = base62.str2mid(wid)
+        self.nick = nick
+        self.user_info_pid = {'pl_content_litePersonInfo',
+                              'pl_content_personInfo'}
 
     def parse_all(self):
         result = {}
@@ -87,15 +88,17 @@ class WeiboParser(object):
         doc = crawl(url, self.opener)
         if doc is None:
             return {}
-        inner_doc = self.get_inner_doc(doc, 'pl_content_personInfo')
+        inner_doc = self.get_inner_doc(doc)
         if inner_doc is None:
+            print 'crawl user info error'
             return {}
         get_num = lambda x : inner_doc.xpath(
                 '//strong[@node-type="%s"]/text()' % x)[0]
         info['follow'] = get_num('follow')
         info['fans'] = get_num('fans')
         info['weibo'] = get_num('weibo')
-        info['city'] = inner_doc.xpath('//p[@class="city"]/text()')[0]
+        info['uid'] = self.uid
+        info['nick'] = self.nick
         return info
 
     def parse_repost_page(self, page, result):
@@ -146,18 +149,18 @@ class WeiboParser(object):
         user_node = node.xpath('./dd/a')[0]
         di['content'] = dd.text_content().split('\n\t')[1];
         di['mid'] = node.xpath('./@mid')[0]
-        di['uname'] = user_node.xpath('./@title')[0]
+        di['nick'] = user_node.xpath('./@title')[0]
         di['uid'] = user_node.xpath('./@usercard')[0].split('=')[1]
         di['wid'] = base62.mid2str(di['mid'])
         return di
 
-    def get_inner_doc(self, doc, pid):
+    def get_inner_doc(self, doc):
         texts = doc.xpath('//text()')
         for text in texts:
             m = re.match(r'STK && STK\.pageletM && STK\.pageletM\.view\(({[^}]+})\)', text)
             if m is not None:
                 innerHtml = json.loads(m.group(1))
-                if innerHtml['pid'] == pid:
+                if innerHtml['pid'] in self.user_info_pid:
                     return fromstring(innerHtml['html'])
 
 # main function
@@ -181,7 +184,7 @@ def recursive_run(uid, wid):
 
     total_count = 0
     depth = 0
-    parser = WeiboParser(opener, uid, wid)
+    parser = WeiboParser(opener, uid, wid, '')
     cache = create_cache(depth)
     page = parser.parse_all()
     cache['list'].append(page)
@@ -193,7 +196,8 @@ def recursive_run(uid, wid):
         new_cache = create_cache(depth)
         for page in cache['list']:
             for repost in page['reposts']:
-                parser = WeiboParser(opener, repost['uid'], repost['wid'])
+                parser = WeiboParser(opener, repost['uid'], repost['wid'],
+                        repost['nick'])
                 page = parser.parse_all()
                 new_cache['list'].append(page)
                 new_cache['count'] = len(page['reposts'])
