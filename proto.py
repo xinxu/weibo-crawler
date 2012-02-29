@@ -46,9 +46,9 @@ def weibo_login():
     loginData = opener.open(request)
     loginUrl = re.search(r'replace\([\"\']([^\'\"]+)[\"\']', loginData.read()).group(1)
     loginResult = opener.open(loginUrl).read()
-    print loginResult
     if (re.search(r'\"result\":true', loginResult) == None):
-        raise 'login failed'
+        print 'login failed'
+        raise
     return opener
 
 class WeiboParser(object):
@@ -63,7 +63,6 @@ class WeiboParser(object):
 
     def parse_all(self):
         result = {}
-        result['userinfo'] = self.parse_user_info()
         result['comments'] = self.parse_comment()
         result['reposts'] = self.parse_repost()
         return result
@@ -82,8 +81,8 @@ class WeiboParser(object):
             page += 1
         return result
 
-    def parse_user_info(self):
-        url = 'http://www.weibo.com/%s/%s' % (self.uid, self.wid)
+    def parse_user_info(self, uid, wid):
+        url = 'http://www.weibo.com/%s/%s' % (uid, wid)
         info = {}
         doc = crawl(url, self.opener)
         if doc is None:
@@ -97,8 +96,6 @@ class WeiboParser(object):
         info['follow'] = get_num('follow')
         info['fans'] = get_num('fans')
         info['weibo'] = get_num('weibo')
-        info['uid'] = self.uid
-        info['nick'] = self.nick
         return info
 
     def parse_repost_page(self, page, result):
@@ -143,7 +140,7 @@ class WeiboParser(object):
             return False
         return True
 
-    def parse_node(self, node):
+    def parse_node(self, node, parse_user_info=True):
         di = {}
         dd = node.xpath('./dd')[0]
         user_node = node.xpath('./dd/a')[0]
@@ -152,7 +149,11 @@ class WeiboParser(object):
         di['nick'] = user_node.xpath('./@title')[0]
         di['uid'] = user_node.xpath('./@usercard')[0].split('=')[1]
         di['wid'] = base62.mid2str(di['mid'])
-        return di
+        if parse_user_info:
+            user_info = self.parse_user_info(di['uid'], di['wid'])
+        else:
+            user_info = {}
+        return dict(di.items() + user_info.items())
 
     def get_inner_doc(self, doc):
         texts = doc.xpath('//text()')
@@ -175,7 +176,7 @@ def recursive_run(uid, wid):
         with open('%s/%s.json' % (dir_str, depth), 'w') as f:
             f.write(json.dumps(cache))
     dir_str = '%s/%s' % (uid, wid)
-    print dir_str
+    print 'output folder is %s\n' % dir_str
     try:
         os.makedirs(dir_str)
     except:
@@ -189,8 +190,8 @@ def recursive_run(uid, wid):
     page = parser.parse_all()
     cache['list'].append(page)
     cache['count'] = len(page['reposts'])
-    record(depth, cache)
     while (cache['count'] > 0):
+        record(depth, cache)
         total_count += cache['count']
         depth += 1
         new_cache = create_cache(depth)
@@ -199,10 +200,10 @@ def recursive_run(uid, wid):
                 parser = WeiboParser(opener, repost['uid'], repost['wid'],
                         repost['nick'])
                 page = parser.parse_all()
-                new_cache['list'].append(page)
-                new_cache['count'] = len(page['reposts'])
+                if (len(page['reposts']) or len(page['comments'])):
+                    new_cache['list'].append(page)
+                    new_cache['count'] += len(page['reposts'])
         cache = new_cache
-        record(depth, cache)
     with open('%s/total.txt' % dir_str, 'w') as f:
         f.write('total count of repost is %d\n' % total_count)
 
