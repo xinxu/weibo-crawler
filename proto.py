@@ -159,6 +159,7 @@ class WeiboParser(object):
                 innerHtml = json.loads(m.group(1))
                 if innerHtml['pid'] == pid:
                     return fromstring(innerHtml['html'])
+
 # main function
 def recursive_run(uid, wid):
     def create_cache(depth):
