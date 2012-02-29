@@ -2,8 +2,8 @@ import urllib, urllib2, cookielib, base64, re, json, hashlib, time, os
 from lxml.html import fromstring
 import base62
 
-username = 'xinxu0x@gmail.com'
-password = 'Whowareyou'
+username = 'your acount'
+password = 'your password'
 client = 'ssologin.js(v.1.3.18)'
 
 def crawl(url, opener):
